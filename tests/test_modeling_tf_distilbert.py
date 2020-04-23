@@ -16,32 +16,41 @@
 
 import unittest
 
-from transformers import ElectraConfig, is_tf_available
+from transformers import DistilBertConfig, is_tf_available
 
 from .test_configuration_common import ConfigTester
 from .test_modeling_tf_common import TFModelTesterMixin, ids_tensor
-from .utils import require_tf, slow
+from .utils import require_tf
 
 
 if is_tf_available():
-    from transformers.modeling_tf_electra import (
-        TFElectraModel,
-        TFElectraForMaskedLM,
-        TFElectraForPreTraining,
-        TFElectraForTokenClassification,
+    from transformers.modeling_tf_distilbert import (
+        TFDistilBertModel,
+        TFDistilBertForMaskedLM,
+        TFDistilBertForQuestionAnswering,
+        TFDistilBertForSequenceClassification,
     )
 
 
 @require_tf
-class TFElectraModelTest(TFModelTesterMixin, unittest.TestCase):
+class TFDistilBertModelTest(TFModelTesterMixin, unittest.TestCase):
 
     all_model_classes = (
-        (TFElectraModel, TFElectraForMaskedLM, TFElectraForPreTraining, TFElectraForTokenClassification,)
+        (
+            TFDistilBertModel,
+            TFDistilBertForMaskedLM,
+            TFDistilBertForQuestionAnswering,
+            TFDistilBertForSequenceClassification,
+        )
         if is_tf_available()
-        else ()
+        else None
     )
+    test_pruning = True
+    test_torchscript = True
+    test_resize_embeddings = True
+    test_head_masking = True
 
-    class TFElectraModelTester(object):
+    class TFDistilBertModelTester(object):
         def __init__(
             self,
             parent,
@@ -49,7 +58,7 @@ class TFElectraModelTest(TFModelTesterMixin, unittest.TestCase):
             seq_length=7,
             is_training=True,
             use_input_mask=True,
-            use_token_type_ids=True,
+            use_token_type_ids=False,
             use_labels=True,
             vocab_size=99,
             hidden_size=32,
@@ -97,10 +106,6 @@ class TFElectraModelTest(TFModelTesterMixin, unittest.TestCase):
             if self.use_input_mask:
                 input_mask = ids_tensor([self.batch_size, self.seq_length], vocab_size=2)
 
-            token_type_ids = None
-            if self.use_token_type_ids:
-                token_type_ids = ids_tensor([self.batch_size, self.seq_length], self.type_vocab_size)
-
             sequence_labels = None
             token_labels = None
             choice_labels = None
@@ -109,33 +114,33 @@ class TFElectraModelTest(TFModelTesterMixin, unittest.TestCase):
                 token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_labels)
                 choice_labels = ids_tensor([self.batch_size], self.num_choices)
 
-            config = ElectraConfig(
+            config = DistilBertConfig(
                 vocab_size=self.vocab_size,
-                hidden_size=self.hidden_size,
-                num_hidden_layers=self.num_hidden_layers,
-                num_attention_heads=self.num_attention_heads,
-                intermediate_size=self.intermediate_size,
+                dim=self.hidden_size,
+                n_layers=self.num_hidden_layers,
+                n_heads=self.num_attention_heads,
+                hidden_dim=self.intermediate_size,
                 hidden_act=self.hidden_act,
-                hidden_dropout_prob=self.hidden_dropout_prob,
-                attention_probs_dropout_prob=self.attention_probs_dropout_prob,
+                dropout=self.hidden_dropout_prob,
+                attention_dropout=self.attention_probs_dropout_prob,
                 max_position_embeddings=self.max_position_embeddings,
-                type_vocab_size=self.type_vocab_size,
                 initializer_range=self.initializer_range,
             )
 
-            return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+            return config, input_ids, input_mask, sequence_labels, token_labels, choice_labels
 
-        def create_and_check_electra_model(
-            self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+        def create_and_check_distilbert_model(
+            self, config, input_ids, input_mask, sequence_labels, token_labels, choice_labels
         ):
-            model = TFElectraModel(config=config)
-            inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
-            (sequence_output,) = model(inputs)
+            model = TFDistilBertModel(config=config)
+            inputs = {"input_ids": input_ids, "attention_mask": input_mask}
+
+            outputs = model(inputs)
+            sequence_output = outputs[0]
 
             inputs = [input_ids, input_mask]
-            (sequence_output,) = model(inputs)
 
-            (sequence_output,) = model(input_ids)
+            (sequence_output,) = model(inputs)
 
             result = {
                 "sequence_output": sequence_output.numpy(),
@@ -144,11 +149,11 @@ class TFElectraModelTest(TFModelTesterMixin, unittest.TestCase):
                 list(result["sequence_output"].shape), [self.batch_size, self.seq_length, self.hidden_size]
             )
 
-        def create_and_check_electra_for_masked_lm(
-            self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+        def create_and_check_distilbert_for_masked_lm(
+            self, config, input_ids, input_mask, sequence_labels, token_labels, choice_labels
         ):
-            model = TFElectraForMaskedLM(config=config)
-            inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
+            model = TFDistilBertForMaskedLM(config=config)
+            inputs = {"input_ids": input_ids, "attention_mask": input_mask}
             (prediction_scores,) = model(inputs)
             result = {
                 "prediction_scores": prediction_scores.numpy(),
@@ -157,71 +162,62 @@ class TFElectraModelTest(TFModelTesterMixin, unittest.TestCase):
                 list(result["prediction_scores"].shape), [self.batch_size, self.seq_length, self.vocab_size]
             )
 
-        def create_and_check_electra_for_pretraining(
-            self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+        def create_and_check_distilbert_for_question_answering(
+            self, config, input_ids, input_mask, sequence_labels, token_labels, choice_labels
         ):
-            model = TFElectraForPreTraining(config=config)
-            inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
-            (prediction_scores,) = model(inputs)
+            model = TFDistilBertForQuestionAnswering(config=config)
+            inputs = {"input_ids": input_ids, "attention_mask": input_mask}
+            start_logits, end_logits = model(inputs)
             result = {
-                "prediction_scores": prediction_scores.numpy(),
+                "start_logits": start_logits.numpy(),
+                "end_logits": end_logits.numpy(),
             }
-            self.parent.assertListEqual(list(result["prediction_scores"].shape), [self.batch_size, self.seq_length])
+            self.parent.assertListEqual(list(result["start_logits"].shape), [self.batch_size, self.seq_length])
+            self.parent.assertListEqual(list(result["end_logits"].shape), [self.batch_size, self.seq_length])
 
-        def create_and_check_electra_for_token_classification(
-            self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+        def create_and_check_distilbert_for_sequence_classification(
+            self, config, input_ids, input_mask, sequence_labels, token_labels, choice_labels
         ):
             config.num_labels = self.num_labels
-            model = TFElectraForTokenClassification(config=config)
-            inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
+            model = TFDistilBertForSequenceClassification(config)
+            inputs = {"input_ids": input_ids, "attention_mask": input_mask}
             (logits,) = model(inputs)
             result = {
                 "logits": logits.numpy(),
             }
-            self.parent.assertListEqual(
-                list(result["logits"].shape), [self.batch_size, self.seq_length, self.num_labels]
-            )
+            self.parent.assertListEqual(list(result["logits"].shape), [self.batch_size, self.num_labels])
 
         def prepare_config_and_inputs_for_common(self):
             config_and_inputs = self.prepare_config_and_inputs()
-            (
-                config,
-                input_ids,
-                token_type_ids,
-                input_mask,
-                sequence_labels,
-                token_labels,
-                choice_labels,
-            ) = config_and_inputs
-            inputs_dict = {"input_ids": input_ids, "token_type_ids": token_type_ids, "attention_mask": input_mask}
+            (config, input_ids, input_mask, sequence_labels, token_labels, choice_labels) = config_and_inputs
+            inputs_dict = {"input_ids": input_ids, "attention_mask": input_mask}
             return config, inputs_dict
 
     def setUp(self):
-        self.model_tester = TFElectraModelTest.TFElectraModelTester(self)
-        self.config_tester = ConfigTester(self, config_class=ElectraConfig, hidden_size=37)
+        self.model_tester = TFDistilBertModelTest.TFDistilBertModelTester(self)
+        self.config_tester = ConfigTester(self, config_class=DistilBertConfig, dim=37)
 
     def test_config(self):
         self.config_tester.run_common_tests()
 
-    def test_electra_model(self):
+    def test_distilbert_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_electra_model(*config_and_inputs)
+        self.model_tester.create_and_check_distilbert_model(*config_and_inputs)
 
     def test_for_masked_lm(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_electra_for_masked_lm(*config_and_inputs)
+        self.model_tester.create_and_check_distilbert_for_masked_lm(*config_and_inputs)
 
-    def test_for_pretraining(self):
+    def test_for_question_answering(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_electra_for_pretraining(*config_and_inputs)
+        self.model_tester.create_and_check_distilbert_for_question_answering(*config_and_inputs)
 
-    def test_for_token_classification(self):
+    def test_for_sequence_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_electra_for_token_classification(*config_and_inputs)
+        self.model_tester.create_and_check_distilbert_for_sequence_classification(*config_and_inputs)
 
-    @slow
-    def test_model_from_pretrained(self):
-        # for model_name in list(TF_ELECTRA_PRETRAINED_MODEL_ARCHIVE_MAP.keys())[:1]:
-        for model_name in ["electra-small-discriminator"]:
-            model = TFElectraModel.from_pretrained(model_name)
-            self.assertIsNotNone(model)
+    # @slow
+    # def test_model_from_pretrained(self):
+    #     for model_name in list(DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP.keys())[:1]:
+    #         model = DistilBertModesss.from_pretrained(model_name)
+    #         self.assertIsNotNone(model)

@@ -16,7 +16,7 @@
 
 import unittest
 
-from transformers import ElectraConfig, is_tf_available
+from transformers import BertConfig, is_tf_available
 
 from .test_configuration_common import ConfigTester
 from .test_modeling_tf_common import TFModelTesterMixin, ids_tensor
@@ -24,24 +24,37 @@ from .utils import require_tf, slow
 
 
 if is_tf_available():
-    from transformers.modeling_tf_electra import (
-        TFElectraModel,
-        TFElectraForMaskedLM,
-        TFElectraForPreTraining,
-        TFElectraForTokenClassification,
+    import tensorflow as tf
+    from transformers.modeling_tf_bert import (
+        TFBertModel,
+        TFBertForMaskedLM,
+        TFBertForNextSentencePrediction,
+        TFBertForPreTraining,
+        TFBertForSequenceClassification,
+        TFBertForMultipleChoice,
+        TFBertForTokenClassification,
+        TFBertForQuestionAnswering,
     )
 
 
 @require_tf
-class TFElectraModelTest(TFModelTesterMixin, unittest.TestCase):
+class TFBertModelTest(TFModelTesterMixin, unittest.TestCase):
 
     all_model_classes = (
-        (TFElectraModel, TFElectraForMaskedLM, TFElectraForPreTraining, TFElectraForTokenClassification,)
+        (
+            TFBertModel,
+            TFBertForMaskedLM,
+            TFBertForNextSentencePrediction,
+            TFBertForPreTraining,
+            TFBertForQuestionAnswering,
+            TFBertForSequenceClassification,
+            TFBertForTokenClassification,
+        )
         if is_tf_available()
         else ()
     )
 
-    class TFElectraModelTester(object):
+    class TFBertModelTester(object):
         def __init__(
             self,
             parent,
@@ -109,7 +122,7 @@ class TFElectraModelTest(TFModelTesterMixin, unittest.TestCase):
                 token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_labels)
                 choice_labels = ids_tensor([self.batch_size], self.num_choices)
 
-            config = ElectraConfig(
+            config = BertConfig(
                 vocab_size=self.vocab_size,
                 hidden_size=self.hidden_size,
                 num_hidden_layers=self.num_hidden_layers,
@@ -125,29 +138,31 @@ class TFElectraModelTest(TFModelTesterMixin, unittest.TestCase):
 
             return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
 
-        def create_and_check_electra_model(
+        def create_and_check_bert_model(
             self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
         ):
-            model = TFElectraModel(config=config)
+            model = TFBertModel(config=config)
             inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
-            (sequence_output,) = model(inputs)
+            sequence_output, pooled_output = model(inputs)
 
             inputs = [input_ids, input_mask]
-            (sequence_output,) = model(inputs)
+            sequence_output, pooled_output = model(inputs)
 
-            (sequence_output,) = model(input_ids)
+            sequence_output, pooled_output = model(input_ids)
 
             result = {
                 "sequence_output": sequence_output.numpy(),
+                "pooled_output": pooled_output.numpy(),
             }
             self.parent.assertListEqual(
                 list(result["sequence_output"].shape), [self.batch_size, self.seq_length, self.hidden_size]
             )
+            self.parent.assertListEqual(list(result["pooled_output"].shape), [self.batch_size, self.hidden_size])
 
-        def create_and_check_electra_for_masked_lm(
+        def create_and_check_bert_for_masked_lm(
             self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
         ):
-            model = TFElectraForMaskedLM(config=config)
+            model = TFBertForMaskedLM(config=config)
             inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
             (prediction_scores,) = model(inputs)
             result = {
@@ -157,22 +172,68 @@ class TFElectraModelTest(TFModelTesterMixin, unittest.TestCase):
                 list(result["prediction_scores"].shape), [self.batch_size, self.seq_length, self.vocab_size]
             )
 
-        def create_and_check_electra_for_pretraining(
+        def create_and_check_bert_for_next_sequence_prediction(
             self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
         ):
-            model = TFElectraForPreTraining(config=config)
+            model = TFBertForNextSentencePrediction(config=config)
             inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
-            (prediction_scores,) = model(inputs)
+            (seq_relationship_score,) = model(inputs)
+            result = {
+                "seq_relationship_score": seq_relationship_score.numpy(),
+            }
+            self.parent.assertListEqual(list(result["seq_relationship_score"].shape), [self.batch_size, 2])
+
+        def create_and_check_bert_for_pretraining(
+            self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+        ):
+            model = TFBertForPreTraining(config=config)
+            inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
+            prediction_scores, seq_relationship_score = model(inputs)
             result = {
                 "prediction_scores": prediction_scores.numpy(),
+                "seq_relationship_score": seq_relationship_score.numpy(),
             }
-            self.parent.assertListEqual(list(result["prediction_scores"].shape), [self.batch_size, self.seq_length])
+            self.parent.assertListEqual(
+                list(result["prediction_scores"].shape), [self.batch_size, self.seq_length, self.vocab_size]
+            )
+            self.parent.assertListEqual(list(result["seq_relationship_score"].shape), [self.batch_size, 2])
 
-        def create_and_check_electra_for_token_classification(
+        def create_and_check_bert_for_sequence_classification(
             self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
         ):
             config.num_labels = self.num_labels
-            model = TFElectraForTokenClassification(config=config)
+            model = TFBertForSequenceClassification(config=config)
+            inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
+            (logits,) = model(inputs)
+            result = {
+                "logits": logits.numpy(),
+            }
+            self.parent.assertListEqual(list(result["logits"].shape), [self.batch_size, self.num_labels])
+
+        def create_and_check_bert_for_multiple_choice(
+            self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+        ):
+            config.num_choices = self.num_choices
+            model = TFBertForMultipleChoice(config=config)
+            multiple_choice_inputs_ids = tf.tile(tf.expand_dims(input_ids, 1), (1, self.num_choices, 1))
+            multiple_choice_input_mask = tf.tile(tf.expand_dims(input_mask, 1), (1, self.num_choices, 1))
+            multiple_choice_token_type_ids = tf.tile(tf.expand_dims(token_type_ids, 1), (1, self.num_choices, 1))
+            inputs = {
+                "input_ids": multiple_choice_inputs_ids,
+                "attention_mask": multiple_choice_input_mask,
+                "token_type_ids": multiple_choice_token_type_ids,
+            }
+            (logits,) = model(inputs)
+            result = {
+                "logits": logits.numpy(),
+            }
+            self.parent.assertListEqual(list(result["logits"].shape), [self.batch_size, self.num_choices])
+
+        def create_and_check_bert_for_token_classification(
+            self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+        ):
+            config.num_labels = self.num_labels
+            model = TFBertForTokenClassification(config=config)
             inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
             (logits,) = model(inputs)
             result = {
@@ -181,6 +242,19 @@ class TFElectraModelTest(TFModelTesterMixin, unittest.TestCase):
             self.parent.assertListEqual(
                 list(result["logits"].shape), [self.batch_size, self.seq_length, self.num_labels]
             )
+
+        def create_and_check_bert_for_question_answering(
+            self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+        ):
+            model = TFBertForQuestionAnswering(config=config)
+            inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
+            start_logits, end_logits = model(inputs)
+            result = {
+                "start_logits": start_logits.numpy(),
+                "end_logits": end_logits.numpy(),
+            }
+            self.parent.assertListEqual(list(result["start_logits"].shape), [self.batch_size, self.seq_length])
+            self.parent.assertListEqual(list(result["end_logits"].shape), [self.batch_size, self.seq_length])
 
         def prepare_config_and_inputs_for_common(self):
             config_and_inputs = self.prepare_config_and_inputs()
@@ -197,31 +271,47 @@ class TFElectraModelTest(TFModelTesterMixin, unittest.TestCase):
             return config, inputs_dict
 
     def setUp(self):
-        self.model_tester = TFElectraModelTest.TFElectraModelTester(self)
-        self.config_tester = ConfigTester(self, config_class=ElectraConfig, hidden_size=37)
+        self.model_tester = TFBertModelTest.TFBertModelTester(self)
+        self.config_tester = ConfigTester(self, config_class=BertConfig, hidden_size=37)
 
     def test_config(self):
         self.config_tester.run_common_tests()
 
-    def test_electra_model(self):
+    def test_bert_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_electra_model(*config_and_inputs)
+        self.model_tester.create_and_check_bert_model(*config_and_inputs)
 
     def test_for_masked_lm(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_electra_for_masked_lm(*config_and_inputs)
+        self.model_tester.create_and_check_bert_for_masked_lm(*config_and_inputs)
+
+    def test_for_multiple_choice(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_bert_for_multiple_choice(*config_and_inputs)
+
+    def test_for_next_sequence_prediction(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_bert_for_next_sequence_prediction(*config_and_inputs)
 
     def test_for_pretraining(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_electra_for_pretraining(*config_and_inputs)
+        self.model_tester.create_and_check_bert_for_pretraining(*config_and_inputs)
+
+    def test_for_question_answering(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_bert_for_question_answering(*config_and_inputs)
+
+    def test_for_sequence_classification(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_bert_for_sequence_classification(*config_and_inputs)
 
     def test_for_token_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_electra_for_token_classification(*config_and_inputs)
+        self.model_tester.create_and_check_bert_for_token_classification(*config_and_inputs)
 
     @slow
     def test_model_from_pretrained(self):
-        # for model_name in list(TF_ELECTRA_PRETRAINED_MODEL_ARCHIVE_MAP.keys())[:1]:
-        for model_name in ["electra-small-discriminator"]:
-            model = TFElectraModel.from_pretrained(model_name)
+        # for model_name in list(TF_BERT_PRETRAINED_MODEL_ARCHIVE_MAP.keys())[:1]:
+        for model_name in ["bert-base-uncased"]:
+            model = TFBertModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
