@@ -18,15 +18,14 @@ import json
 import os
 import unittest
 
-from transformers.tokenization_xlm import VOCAB_FILES_NAMES, XLMTokenizer
+from transformers.tokenization_openai import VOCAB_FILES_NAMES, OpenAIGPTTokenizer
 
 from .test_tokenization_common import TokenizerTesterMixin
-from .utils import slow
 
 
-class XLMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
+class OpenAIGPTTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
-    tokenizer_class = XLMTokenizer
+    tokenizer_class = OpenAIGPTTokenizer
 
     def setUp(self):
         super().setUp()
@@ -56,7 +55,7 @@ class XLMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             "<unk>",
         ]
         vocab_tokens = dict(zip(vocab, range(len(vocab))))
-        merges = ["l o 123", "lo w 1456", "e r</w> 1789", ""]
+        merges = ["#version: 0.2", "l o", "lo w", "e r</w>", ""]
 
         self.vocab_file = os.path.join(self.tmpdirname, VOCAB_FILES_NAMES["vocab_file"])
         self.merges_file = os.path.join(self.tmpdirname, VOCAB_FILES_NAMES["merges_file"])
@@ -66,13 +65,10 @@ class XLMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             fp.write("\n".join(merges))
 
     def get_input_output_texts(self):
-        input_text = "lower newer"
-        output_text = "lower newer"
-        return input_text, output_text
+        return "lower newer", "lower newer"
 
     def test_full_tokenizer(self):
-        """ Adapted from Sennrich et al. 2015 and https://github.com/rsennrich/subword-nmt """
-        tokenizer = XLMTokenizer(self.vocab_file, self.merges_file)
+        tokenizer = OpenAIGPTTokenizer(self.vocab_file, self.merges_file)
 
         text = "lower"
         bpe_tokens = ["low", "er</w>"]
@@ -82,16 +78,3 @@ class XLMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         input_tokens = tokens + ["<unk>"]
         input_bpe_tokens = [14, 15, 20]
         self.assertListEqual(tokenizer.convert_tokens_to_ids(input_tokens), input_bpe_tokens)
-
-    @slow
-    def test_sequence_builders(self):
-        tokenizer = XLMTokenizer.from_pretrained("xlm-mlm-en-2048")
-
-        text = tokenizer.encode("sequence builders", add_special_tokens=False)
-        text_2 = tokenizer.encode("multi-sequence build", add_special_tokens=False)
-
-        encoded_sentence = tokenizer.build_inputs_with_special_tokens(text)
-        encoded_pair = tokenizer.build_inputs_with_special_tokens(text, text_2)
-
-        assert encoded_sentence == [0] + text + [1]
-        assert encoded_pair == [0] + text + [1] + text_2 + [1]
