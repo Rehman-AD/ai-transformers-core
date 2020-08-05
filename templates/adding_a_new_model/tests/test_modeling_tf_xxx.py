@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 The Google AI Language Team Authors.
+# Copyright 2018 XXX Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,46 +16,42 @@
 
 import unittest
 
-from transformers import MobileBertConfig, is_tf_available
-from transformers.testing_utils import require_tf, slow
+from transformers import XxxConfig, is_tf_available
 
 from .test_configuration_common import ConfigTester
 from .test_modeling_tf_common import TFModelTesterMixin, ids_tensor
+from .utils import CACHE_DIR, require_tf, slow
 
 
 if is_tf_available():
     import tensorflow as tf
-    from transformers.modeling_tf_mobilebert import (
-        TFMobileBertModel,
-        TFMobileBertForMaskedLM,
-        TFMobileBertForNextSentencePrediction,
-        TFMobileBertForPreTraining,
-        TFMobileBertForSequenceClassification,
-        TFMobileBertForMultipleChoice,
-        TFMobileBertForTokenClassification,
-        TFMobileBertForQuestionAnswering,
+    from transformers.modeling_tf_xxx import (
+        TFXxxModel,
+        TFXxxForMaskedLM,
+        TFXxxForMultipleChoice,
+        TFXxxForSequenceClassification,
+        TFXxxForTokenClassification,
+        TFXxxForQuestionAnswering,
     )
 
 
 @require_tf
-class TFMobileBertModelTest(TFModelTesterMixin, unittest.TestCase):
+class TFXxxModelTest(TFModelTesterMixin, unittest.TestCase):
 
     all_model_classes = (
         (
-            TFMobileBertModel,
-            TFMobileBertForMaskedLM,
-            TFMobileBertForNextSentencePrediction,
-            TFMobileBertForPreTraining,
-            TFMobileBertForQuestionAnswering,
-            TFMobileBertForSequenceClassification,
-            TFMobileBertForTokenClassification,
-            TFMobileBertForMultipleChoice,
+            TFXxxModel,
+            TFXxxForMaskedLM,
+            TFXxxForMultipleChoice,
+            TFXxxForQuestionAnswering,
+            TFXxxForSequenceClassification,
+            TFXxxForTokenClassification,
         )
         if is_tf_available()
         else ()
     )
 
-    class TFMobileBertModelTester(object):
+    class TFXxxModelTester(object):
         def __init__(
             self,
             parent,
@@ -67,7 +63,6 @@ class TFMobileBertModelTest(TFModelTesterMixin, unittest.TestCase):
             use_labels=True,
             vocab_size=99,
             hidden_size=32,
-            embedding_size=32,
             num_hidden_layers=5,
             num_attention_heads=4,
             intermediate_size=37,
@@ -104,7 +99,6 @@ class TFMobileBertModelTest(TFModelTesterMixin, unittest.TestCase):
             self.num_labels = num_labels
             self.num_choices = num_choices
             self.scope = scope
-            self.embedding_size = embedding_size
 
         def prepare_config_and_inputs(self):
             input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
@@ -125,7 +119,7 @@ class TFMobileBertModelTest(TFModelTesterMixin, unittest.TestCase):
                 token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_labels)
                 choice_labels = ids_tensor([self.batch_size], self.num_choices)
 
-            config = MobileBertConfig(
+            config = XxxConfig(
                 vocab_size=self.vocab_size,
                 hidden_size=self.hidden_size,
                 num_hidden_layers=self.num_hidden_layers,
@@ -137,16 +131,15 @@ class TFMobileBertModelTest(TFModelTesterMixin, unittest.TestCase):
                 max_position_embeddings=self.max_position_embeddings,
                 type_vocab_size=self.type_vocab_size,
                 initializer_range=self.initializer_range,
-                embedding_size=self.embedding_size,
                 return_dict=True,
             )
 
             return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
 
-        def create_and_check_mobilebert_model(
+        def create_and_check_xxx_model(
             self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
         ):
-            model = TFMobileBertModel(config=config)
+            model = TFXxxModel(config=config)
             inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
             result = model(inputs)
 
@@ -160,49 +153,30 @@ class TFMobileBertModelTest(TFModelTesterMixin, unittest.TestCase):
             )
             self.parent.assertListEqual(list(result["pooler_output"].shape), [self.batch_size, self.hidden_size])
 
-        def create_and_check_mobilebert_for_masked_lm(
+        def create_and_check_xxx_for_masked_lm(
             self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
         ):
-            model = TFMobileBertForMaskedLM(config=config)
+            model = TFXxxForMaskedLM(config=config)
             inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
             result = model(inputs)
             self.parent.assertListEqual(
                 list(result["logits"].shape), [self.batch_size, self.seq_length, self.vocab_size]
             )
 
-        def create_and_check_mobilebert_for_next_sequence_prediction(
-            self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
-        ):
-            model = TFMobileBertForNextSentencePrediction(config=config)
-            inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
-            result = model(inputs)
-            self.parent.assertListEqual(list(result["logits"].shape), [self.batch_size, 2])
-
-        def create_and_check_mobilebert_for_pretraining(
-            self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
-        ):
-            model = TFMobileBertForPreTraining(config=config)
-            inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
-            result = model(inputs)
-            self.parent.assertListEqual(
-                list(result["prediction_logits"].shape), [self.batch_size, self.seq_length, self.vocab_size]
-            )
-            self.parent.assertListEqual(list(result["seq_relationship_logits"].shape), [self.batch_size, 2])
-
-        def create_and_check_mobilebert_for_sequence_classification(
+        def create_and_check_xxx_for_sequence_classification(
             self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
         ):
             config.num_labels = self.num_labels
-            model = TFMobileBertForSequenceClassification(config=config)
+            model = TFXxxForSequenceClassification(config=config)
             inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
             result = model(inputs)
             self.parent.assertListEqual(list(result["logits"].shape), [self.batch_size, self.num_labels])
 
-        def create_and_check_mobilebert_for_multiple_choice(
+        def create_and_check_bert_for_multiple_choice(
             self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
         ):
             config.num_choices = self.num_choices
-            model = TFMobileBertForMultipleChoice(config=config)
+            model = TFXxxForMultipleChoice(config=config)
             multiple_choice_inputs_ids = tf.tile(tf.expand_dims(input_ids, 1), (1, self.num_choices, 1))
             multiple_choice_input_mask = tf.tile(tf.expand_dims(input_mask, 1), (1, self.num_choices, 1))
             multiple_choice_token_type_ids = tf.tile(tf.expand_dims(token_type_ids, 1), (1, self.num_choices, 1))
@@ -214,21 +188,21 @@ class TFMobileBertModelTest(TFModelTesterMixin, unittest.TestCase):
             result = model(inputs)
             self.parent.assertListEqual(list(result["logits"].shape), [self.batch_size, self.num_choices])
 
-        def create_and_check_mobilebert_for_token_classification(
+        def create_and_check_xxx_for_token_classification(
             self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
         ):
             config.num_labels = self.num_labels
-            model = TFMobileBertForTokenClassification(config=config)
+            model = TFXxxForTokenClassification(config=config)
             inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
             result = model(inputs)
             self.parent.assertListEqual(
                 list(result["logits"].shape), [self.batch_size, self.seq_length, self.num_labels]
             )
 
-        def create_and_check_mobilebert_for_question_answering(
+        def create_and_check_xxx_for_question_answering(
             self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
         ):
-            model = TFMobileBertForQuestionAnswering(config=config)
+            model = TFXxxForQuestionAnswering(config=config)
             inputs = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": token_type_ids}
             result = model(inputs)
             self.parent.assertListEqual(list(result["start_logits"].shape), [self.batch_size, self.seq_length])
@@ -249,47 +223,34 @@ class TFMobileBertModelTest(TFModelTesterMixin, unittest.TestCase):
             return config, inputs_dict
 
     def setUp(self):
-        self.model_tester = TFMobileBertModelTest.TFMobileBertModelTester(self)
-        self.config_tester = ConfigTester(self, config_class=MobileBertConfig, hidden_size=37)
+        self.model_tester = TFXxxModelTest.TFXxxModelTester(self)
+        self.config_tester = ConfigTester(self, config_class=XxxConfig, hidden_size=37)
 
     def test_config(self):
         self.config_tester.run_common_tests()
 
-    def test_mobilebert_model(self):
+    def test_xxx_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_mobilebert_model(*config_and_inputs)
+        self.model_tester.create_and_check_xxx_model(*config_and_inputs)
 
     def test_for_masked_lm(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_mobilebert_for_masked_lm(*config_and_inputs)
-
-    def test_for_multiple_choice(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_mobilebert_for_multiple_choice(*config_and_inputs)
-
-    def test_for_next_sequence_prediction(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_mobilebert_for_next_sequence_prediction(*config_and_inputs)
-
-    def test_for_pretraining(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_mobilebert_for_pretraining(*config_and_inputs)
+        self.model_tester.create_and_check_xxx_for_masked_lm(*config_and_inputs)
 
     def test_for_question_answering(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_mobilebert_for_question_answering(*config_and_inputs)
+        self.model_tester.create_and_check_xxx_for_question_answering(*config_and_inputs)
 
     def test_for_sequence_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_mobilebert_for_sequence_classification(*config_and_inputs)
+        self.model_tester.create_and_check_xxx_for_sequence_classification(*config_and_inputs)
 
     def test_for_token_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_mobilebert_for_token_classification(*config_and_inputs)
+        self.model_tester.create_and_check_xxx_for_token_classification(*config_and_inputs)
 
     @slow
     def test_model_from_pretrained(self):
-        # for model_name in TF_MOBILEBERT_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
-        for model_name in ["mobilebert-uncased"]:
-            model = TFMobileBertModel.from_pretrained(model_name)
+        for model_name in ["xxx-base-uncased"]:
+            model = TFXxxModel.from_pretrained(model_name, cache_dir=CACHE_DIR)
             self.assertIsNotNone(model)
